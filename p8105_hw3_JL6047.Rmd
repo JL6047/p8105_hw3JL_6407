@@ -1,0 +1,153 @@
+---
+title: "p8105_hw_JL6047"
+author: "Eric Luo"
+date: "2022-10-14"
+output: html_document
+---
+P1:
+```{r}
+library(p8105.datasets)
+data("instacart")
+skimr::skim(instacart)
+head(instacart)
+```
+There are 134 unique aisles 
+
+```{r}
+insta = count(instacart,aisle)%>%
+arrange(desc(n))
+```
+Fresh Vegetables are the mostly ordered
+
+```{r}
+instacart %>% 
+  count(aisle) %>% 
+  filter(n > 10000) %>% 
+  mutate(aisle = fct_reorder(aisle, n)) %>% 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+```{r}
+instacart%>%
+  select(aisle,product_name)%>%
+  filter(aisle=="baking ingredients")%>%
+  count(product_name)%>%
+  arrange(desc(n))%>%
+
+instacart%>%
+  select(aisle,product_name)%>%
+  filter(aisle=="dog food care")%>%
+  count(product_name)%>%
+  arrange(desc(n))
+
+instacart%>%
+  select(aisle,product_name)%>%
+  filter(aisle=="packaged vegetables fruits")%>%
+  count(product_name)%>%
+  arrange(desc(n))
+
+```{r}
+instacart %>% 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+  group_by(aisle) %>% 
+  count(product_name) %>% 
+  mutate(rank = min_rank(desc(n))) %>% 
+  filter(rank < 4) %>% 
+  arrange(desc(n)) %>%
+  knitr::kable()
+```
+what i did vs solution 
+
+
+P2:
+load tidy and wrangle data
+```{r}
+library(tidyverse)
+accel = read_csv(file = "./accel_data.csv")%>%
+  janitor::clean_names()
+accel = mutate( accel,weekday_vs_weekend = ifelse(day=="Monday","Weekday",
+                                          ifelse(day=="Tuesday","Weekday",
+                                                 ifelse(day=="Wednesday","Weekday",
+                                                        ifelse(day=="Thursday","Weekday",
+                                                               ifelse(day=="Friday","Weekday","Weekend"
+                                                                      ))))))
+```
+variables include day,week,and heartbeat count of every minute of the day, and the weekday_vs_weekend variable
+
+create a new variable for total beats of the day
+```{r}
+accel_day = accel %>%
+  mutate(day_beat=rowSums(accel_day[,c(4:1443)]))%>%
+  select(week,day_id,day,weekday_vs_weekend,day_beat)
+```
+The total beats fluctuate a lot, maybe he did not wear the watch or the machine was not counting at the some points of the day (looking at the 1's in the data)
+
+make a single panel plot
+```{r}
+  ggplot(accel_day, aes(x = day, y = day_beat))+
+    geom_point(aes(color = day), alpha = .5) 
+```
+His heart beats are really inconsistent
+
+
+p3:
+
+```{r}
+library(p8105.datasets)
+data("ny_noaa")
+skimr::skim(ny_noaa)
+```
+It is a very big data set with almost 3 million observation of 10957 days and 747 stations. Key variables include StationID, Max and Min Temperatures. Others are precipitation, snowfall and snow depth. The missing data are almost of half of the dataset on tmax and tmin, which could be a problem.
+
+create separate variables for year,month,and day,convert units to be reasonable
+```{r}
+ny_noaa = ny_noaa %>% 
+  janitor::clean_names()%>% 
+  separate(date, c("year","month","day"))%>%
+  mutate(tmax = as.numeric(tmax)/10) %>% 
+  mutate(prcp = as.numeric(prcp)/10 ) %>% 
+  mutate(tmin = as.numeric(tmin)/10 )
+```
+the most common observed value is 0 because often there is no snow!
+
+two-panel plots for average max temp in Jan and July
+```{r}
+ny_noaa%>%
+  filter(month=='01'|month=='07')%>%
+  filter(!is.na(tmax)) %>% 
+  group_by(month,year,id)%>%
+  summarise(mean_month = mean(tmax))%>%
+  ggplot(aes(
+    x=factor(year),
+    y=mean_month,
+    color=year))+
+  geom_point() +
+  facet_grid(.~month)+
+  ggtitle('Mean max temperature in January and July in each station across years')+
+  theme(axis.text.x = element_text(angle = 90, hjust = 5))
+```
+It is apparently way hotter in July. 
+
+i).tmax vs tmin for full data
+```{r}
+ny_noaa%>%
+  filter(!is.na(tmax),!is.na(tmin)) %>% 
+  ggplot(aes(x = tmax, y = tmin)) + 
+  geom_hex() +
+  ggtitle('tmax vs tmin')
+```
+
+ii).>0 <100 snowfall separately by year
+```{r}
+ny_noaa%>%
+  filter(!is.na(snow)) %>%
+  filter(snow>0&snow<100)%>%
+  group_by(year)%>%
+  ggplot(aes(x=snow,
+             color=year))+
+  geom_density()+
+  ggtitle("Distribution of Snow Fall by year")
+```
